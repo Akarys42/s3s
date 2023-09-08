@@ -3,7 +3,9 @@ s3s 🦑
 
 **s3s** is a script that uploads _Splatoon 3_ battle data from the SplatNet 3 service (part of the Nintendo Switch Online app) to [stat.ink](https://stat.ink/), a site for recording, visualizing, and aggregating statistics from the *Splatoon* series of games.
 
-(ja) 日本語版セットアップ手順は[こちら](https://vanillasalt.net/2022/10/10/how-to-use-s3s/)、または[こちら](https://zenn.dev/hibikine/articles/1febb4eb03b604)。
+(ja) 日本語版セットアップ手順は[こちら](https://nerune-jp.com/splatoon3-statink/)、または[こちら](https://vanillasalt.net/2022/10/10/how-to-use-s3s/)。
+
+(ko) 한국어 가이드는 [여기](https://github.com/cake-monotone/s3s)를 참조해 주세요.
 
 Looking to track your _Splatoon 2_ gameplay? See **[splatnet2statink](https://github.com/frozenpandaman/splatnet2statink)**.
 
@@ -73,11 +75,9 @@ Have any questions, problems, or suggestions? [Create an issue](https://github.c
 
 ### Accessing SplatNet 3 from your browser
 
-If you wish to access SplatNet 3 from your computer rather than via the phone app, navigate to [https://api.lp1.av5ja.srv.nintendo.net/](https://api.lp1.av5ja.srv.nintendo.net/) (it should show server maintenance). Use your browser or a third-party extension to add a cookie (Chrome instructions [here](https://developer.chrome.com/docs/devtools/storage/cookies/)) named `_gtoken`. Set it to the value you obtained previously (automatically by running the script or via [mitmproxy](https://github.com/frozenpandaman/s3s/wiki/mitmproxy-instructions)) – stored as `gtoken` in `config.txt` – and refresh the page. If you only want to access SplatNet and don't have a stat.ink API key, simply enter "skip" for this step during setup.
+If you wish to access SplatNet 3 from your computer rather than via the NSO phone app, or if you don't have a smartphone, follow [this s3s wiki article](https://github.com/frozenpandaman/s3s/wiki/in%E2%80%90browser-splatnet-3) to enable the use of SplatNet in-browser.
 
-To access SplatNet 3 in a language other than English, go to `https://api.lp1.av5ja.srv.nintendo.net/?lang=xx-XX` where `xx-XX` is one of the available [language codes](https://github.com/frozenpandaman/s3s/wiki/languages).
-
-You can even enter QR codes on the web version of SplatNet 3 via the list of available ones [here](https://github.com/frozenpandaman/s3s/wiki/list-of-qr-codes)!
+SplatNet 3 can be used in any available game language. You can even enter QR codes on the web version of the app via the list of available ones [here](https://github.com/frozenpandaman/s3s/wiki/list-of-qr-codes)!
 
 *Splatoon 3* stage rotation information, Splatfest data, and current SplatNet gear are viewable at [splatoon3.ink](https://splatoon3.ink/).
 

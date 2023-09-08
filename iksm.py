@@ -10,9 +10,9 @@ USE_OLD_NSOAPP_VER    = False # Change this to True if you're getting a "9403: I
 
 S3S_VERSION           = "unknown"
 NSOAPP_VERSION        = "unknown"
-NSOAPP_VER_FALLBACK   = "2.5.2"
+NSOAPP_VER_FALLBACK   = "2.7.0"
 WEB_VIEW_VERSION      = "unknown"
-WEB_VIEW_VER_FALLBACK = "4.0.0-d5178440" # fallback for current splatnet 3 ver
+WEB_VIEW_VER_FALLBACK = "4.0.0-091d4283" # fallback for current splatnet 3 ver
 SPLATNET3_URL         = "https://api.lp1.av5ja.srv.nintendo.net"
 
 # functions in this file & call stack:
@@ -202,7 +202,13 @@ def get_session_token(session_token_code, auth_code_verifier):
 	url = 'https://accounts.nintendo.com/connect/1.0.0/api/session_token'
 
 	r = session.post(url, headers=app_head, data=body)
-	return json.loads(r.text)["session_token"]
+	try:
+		s_t = json.loads(r.text)["session_token"]
+	except json.decoder.JSONDecodeError:
+		print("Got non-JSON response from Nintendo (in api/session_token step). Please try again.")
+		sys.exit(1)
+
+	return s_t
 
 
 def get_gtoken(f_gen_url, session_token, ver):
@@ -231,7 +237,11 @@ def get_gtoken(f_gen_url, session_token, ver):
 
 	url = "https://accounts.nintendo.com/connect/1.0.0/api/token"
 	r = requests.post(url, headers=app_head, json=body)
-	id_response = json.loads(r.text)
+	try:
+		id_response = json.loads(r.text)
+	except json.decoder.JSONDecodeError:
+		print("Got non-JSON response from Nintendo (in api/token step). Please try again.")
+		sys.exit(1)
 
 	# get user info
 	try:
@@ -252,7 +262,11 @@ def get_gtoken(f_gen_url, session_token, ver):
 
 	url = "https://api.accounts.nintendo.com/2.0.0/users/me"
 	r = requests.get(url, headers=app_head)
-	user_info = json.loads(r.text)
+	try:
+		user_info = json.loads(r.text)
+	except json.decoder.JSONDecodeError:
+		print("Got non-JSON response from Nintendo (in users/me step). Please try again.")
+		sys.exit(1)
 
 	user_nickname = user_info["nickname"]
 	user_lang     = user_info["language"]
@@ -295,7 +309,11 @@ def get_gtoken(f_gen_url, session_token, ver):
 
 	url = "https://api-lp1.znc.srv.nintendo.net/v3/Account/Login"
 	r = requests.post(url, headers=app_head, json=body)
-	splatoon_token = json.loads(r.text)
+	try:
+		splatoon_token = json.loads(r.text)
+	except json.decoder.JSONDecodeError:
+		print("Got non-JSON response from Nintendo (in Account/Login step). Please try again.")
+		sys.exit(1)
 
 	try:
 		access_token  = splatoon_token["result"]["webApiServerCredential"]["accessToken"]
@@ -344,7 +362,11 @@ def get_gtoken(f_gen_url, session_token, ver):
 
 	url = "https://api-lp1.znc.srv.nintendo.net/v2/Game/GetWebServiceToken"
 	r = requests.post(url, headers=app_head, json=body)
-	web_service_resp = json.loads(r.text)
+	try:
+		web_service_resp = json.loads(r.text)
+	except json.decoder.JSONDecodeError:
+		print("Got non-JSON response from Nintendo (in Game/GetWebServiceToken step). Please try again.")
+		sys.exit(1)
 
 	try:
 		web_service_token = web_service_resp["result"]["accessToken"]
