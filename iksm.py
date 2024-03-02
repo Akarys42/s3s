@@ -1,22 +1,21 @@
-# (ↄ) 2017-2023 eli fessler (frozenpandaman), clovervidia
+# (ↄ) 2017-2024 eli fessler (frozenpandaman), clovervidia
 # https://github.com/frozenpandaman/s3s
 # License: GPLv3
 
 import base64, hashlib, json, os, re, sys, urllib
 import requests
 from bs4 import BeautifulSoup
-from s3s import F_GEN_URL as f_gen_url
-from s3s import A_VERSION as s3s_ver
 
 USE_OLD_NSOAPP_VER    = False # Change this to True if you're getting a "9403: Invalid token." error
 
 S3S_VERSION           = "unknown"
 NSOAPP_VERSION        = "unknown"
-NSOAPP_VER_FALLBACK   = "2.8.1"
+NSOAPP_VER_FALLBACK   = "2.9.0"
 WEB_VIEW_VERSION      = "unknown"
-WEB_VIEW_VER_FALLBACK = "6.0.0-1249ecb9" # fallback for current splatnet 3 ver
+WEB_VIEW_VER_FALLBACK = "6.0.0-eb33aadc" # fallback for current splatnet 3 ver
 SPLATNET3_URL         = "https://api.lp1.av5ja.srv.nintendo.net"
 GRAPHQL_URL           = SPLATNET3_URL + "/api/graphql"
+F_GEN_URL             = "unknown"
 
 # functions in this file & call stack:
 # - get_nsoapp_version()
@@ -38,9 +37,18 @@ def get_nsoapp_version():
 	if NSOAPP_VERSION != "unknown": # already set
 		return NSOAPP_VERSION
 	else:
+		# should exist already - from log_in() or get_gtoken() - but check to make sure
+		try:
+			global S3S_VERSION, F_GEN_URL
+			assert S3S_VERSION != "unknown"
+			assert F_GEN_URL != "unknown"
+		except AssertionError:
+			print("Cannot determine s3s version or f generation API.")
+			sys.exit(1)
+
 		try: # try to get NSO version from f API
-			f_conf_url = os.path.dirname(f_gen_url) + "/config" # default endpoint for imink API
-			f_conf_header = {'User-Agent': f's3s/{s3s_ver}'}
+			f_conf_url = os.path.dirname(F_GEN_URL) + "/config" # default endpoint for imink API
+			f_conf_header = {'User-Agent': f's3s/{S3S_VERSION}'}
 			f_conf_rsp = requests.get(f_conf_url, headers=f_conf_header)
 			f_conf_json = json.loads(f_conf_rsp.text)
 			ver = f_conf_json["nso_version"]
@@ -140,17 +148,18 @@ def get_web_view_ver(bhead=[], gtoken=""):
 		return WEB_VIEW_VERSION
 
 
-def log_in(ver, app_user_agent):
+def log_in(ver, app_user_agent, f_gen_url):
 	'''Logs in to a Nintendo Account and returns a session_token.'''
 
-	global S3S_VERSION
+	global S3S_VERSION, F_GEN_URL
 	S3S_VERSION = ver
+	F_GEN_URL = f_gen_url
 
 	auth_state = base64.urlsafe_b64encode(os.urandom(36))
 
 	auth_code_verifier = base64.urlsafe_b64encode(os.urandom(32))
 	auth_cv_hash = hashlib.sha256()
-	auth_cv_hash.update(auth_code_verifier.replace(b"=", b""))
+	auth_cv_hash.update(auth_code_verifier.replace(b'=', b''))
 	auth_code_challenge = base64.urlsafe_b64encode(auth_cv_hash.digest())
 
 	app_head = {
@@ -170,7 +179,7 @@ def log_in(ver, app_user_agent):
 		'client_id':                           '71b963c1b7b6d119',
 		'scope':                               'openid user user.birthday user.mii user.screenName',
 		'response_type':                       'session_token_code',
-		'session_token_code_challenge':        auth_code_challenge.replace(b"=", b""),
+		'session_token_code_challenge':        auth_code_challenge.replace(b'=', b''),
 		'session_token_code_challenge_method': 'S256',
 		'theme':                               'login_form'
 	}
@@ -185,17 +194,14 @@ def log_in(ver, app_user_agent):
 			use_account_url = input("")
 			if use_account_url == "skip":
 				return "skip"
-			session_token_code = re.search('de=(.*)&', use_account_url)
-			return get_session_token(session_token_code.group(1), auth_code_verifier)
+			session_token_code = re.search('de=(.*)&st', use_account_url).group(1)
+			return get_session_token(session_token_code, auth_code_verifier)
 		except KeyboardInterrupt:
 			print("\nBye!")
 			sys.exit(1)
 		except AttributeError:
 			print("Malformed URL. Please try again, or press Ctrl+C to exit.")
 			print("URL:", end=' ')
-		except KeyError: # session_token not found
-			print("\nThe URL has expired. Please log out and back into your Nintendo Account and try again.")
-			sys.exit(1)
 
 
 def get_session_token(session_token_code, auth_code_verifier):
@@ -217,16 +223,21 @@ def get_session_token(session_token_code, auth_code_verifier):
 	body = {
 		'client_id':                   '71b963c1b7b6d119',
 		'session_token_code':          session_token_code,
-		'session_token_code_verifier': auth_code_verifier.replace(b"=", b"")
+		'session_token_code_verifier': auth_code_verifier.replace(b'=', b'')
 	}
 
 	url = 'https://accounts.nintendo.com/connect/1.0.0/api/session_token'
-
 	r = session.post(url, headers=app_head, data=body)
 	try:
-		s_t = json.loads(r.text)["session_token"]
+		container = json.loads(r.text)
+		s_t       = container["session_token"]
 	except json.decoder.JSONDecodeError:
 		print("Got non-JSON response from Nintendo (in api/session_token step). Please try again.")
+		sys.exit(1)
+	except KeyError:
+		print("\nThe URL has expired. Logging out & back in to your Nintendo Account and retrying may fix this.")
+		print("Error from Nintendo (in api/session_token step):")
+		print(json.dumps(container, indent=2))
 		sys.exit(1)
 
 	return s_t
@@ -235,10 +246,11 @@ def get_session_token(session_token_code, auth_code_verifier):
 def get_gtoken(f_gen_url, session_token, ver):
 	'''Provided the session_token, returns a GameWebToken JWT and account info.'''
 
-	nsoapp_version = get_nsoapp_version()
-
-	global S3S_VERSION
+	global S3S_VERSION, F_GEN_URL
 	S3S_VERSION = ver
+	F_GEN_URL = f_gen_url
+
+	nsoapp_version = get_nsoapp_version()
 
 	app_head = {
 		'Host':            'accounts.nintendo.com',
@@ -247,7 +259,7 @@ def get_gtoken(f_gen_url, session_token, ver):
 		'Content-Length':  '436',
 		'Accept':          'application/json',
 		'Connection':      'Keep-Alive',
-		'User-Agent':      'Dalvik/2.1.0 (Linux; U; Android 7.1.2)'
+		'User-Agent':      'Dalvik/2.1.0 (Linux; U; Android 14; Pixel 7a Build/UQ1A.240105.004)'
 	}
 
 	body = {
@@ -325,7 +337,7 @@ def get_gtoken(f_gen_url, session_token, ver):
 		'Content-Length':   str(990 + len(f)),
 		'Connection':       'Keep-Alive',
 		'Accept-Encoding':  'gzip',
-		'User-Agent':       f'com.nintendo.znca/{nsoapp_version}(Android/7.1.2)',
+		'User-Agent':       f'com.nintendo.znca/{nsoapp_version}(Android/14)',
 	}
 
 	url = "https://api-lp1.znc.srv.nintendo.net/v3/Account/Login"
@@ -338,7 +350,7 @@ def get_gtoken(f_gen_url, session_token, ver):
 
 	try:
 		access_token  = splatoon_token["result"]["webApiServerCredential"]["accessToken"]
-		coral_user_id = splatoon_token["result"]["user"]["id"]
+		coral_user_id = str(splatoon_token["result"]["user"]["id"])
 	except:
 		# retry once if 9403/9599 error from nintendo
 		try:
@@ -351,7 +363,7 @@ def get_gtoken(f_gen_url, session_token, ver):
 			r = requests.post(url, headers=app_head, json=body)
 			splatoon_token = json.loads(r.text)
 			access_token  = splatoon_token["result"]["webApiServerCredential"]["accessToken"]
-			coral_user_id = splatoon_token["result"]["user"]["id"]
+			coral_user_id = str(splatoon_token["result"]["user"]["id"])
 		except:
 			print("Error from Nintendo (in Account/Login step):")
 			print(json.dumps(splatoon_token, indent=2))
@@ -368,7 +380,7 @@ def get_gtoken(f_gen_url, session_token, ver):
 		'Content-Type':     'application/json; charset=utf-8',
 		'Content-Length':   '391',
 		'Accept-Encoding':  'gzip',
-		'User-Agent':       f'com.nintendo.znca/{nsoapp_version}(Android/7.1.2)'
+		'User-Agent':       f'com.nintendo.znca/{nsoapp_version}(Android/14)'
 	}
 
 	body = {}
@@ -460,9 +472,12 @@ def call_f_api(access_token, step, f_gen_url, user_id, coral_user_id=None):
 	'''Passes naIdToken & user ID to f generation API (default: imink) & fetches response (f token, UUID, timestamp).'''
 
 	try:
+		nsoapp_version = get_nsoapp_version()
 		api_head = {
-			'User-Agent':   f's3s/{S3S_VERSION}',
-			'Content-Type': 'application/json; charset=utf-8'
+			'User-Agent':      f's3s/{S3S_VERSION}',
+			'Content-Type':    'application/json; charset=utf-8',
+			'X-znca-Platform': 'Android',
+			'X-znca-Version':  nsoapp_version
 		}
 		api_body = { # 'timestamp' & 'request_id' (uuid v4) set automatically
 			'token':       access_token,
