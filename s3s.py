@@ -11,7 +11,7 @@ import requests, msgpack
 from packaging import version
 import iksm, utils
 
-A_VERSION = "0.6.3"
+A_VERSION = "0.6.5"
 
 DEBUG = False
 
@@ -679,6 +679,7 @@ def prepare_battle_result(battle, ismonitoring, isblackout, overview_data=None):
 				overview_data = None
 				print("Failed to get recent Anarchy Battles. Proceeding without information on current rank.")
 		if overview_data is not None:
+			ranked_list = []
 			for screen in overview_data:
 				if "bankaraBattleHistories" in screen["data"]:
 					ranked_list = screen["data"]["bankaraBattleHistories"]["historyGroups"]["nodes"]
@@ -766,6 +767,7 @@ def prepare_battle_result(battle, ismonitoring, isblackout, overview_data=None):
 				overview_data = None
 				print("Failed to get recent X Battles. Proceeding without some information on X Power.")
 		if overview_data is not None:
+			x_list = []
 			for screen in overview_data:
 				if "xBattleHistories" in screen["data"]:
 					x_list = screen["data"]["xBattleHistories"]["historyGroups"]["nodes"]
@@ -817,6 +819,11 @@ def prepare_battle_result(battle, ismonitoring, isblackout, overview_data=None):
 			player["name"] = None
 			player["number"] = None
 			player["splashtag_title"] = None
+		if "third_team_players" in payload:
+			for player in payload["third_team_players"]:
+				player["name"] = None
+				player["number"] = None
+				player["splashtag_title"] = None
 
 		# fix battle json
 		for player in battle["myTeam"]["players"]:
